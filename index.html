@@ -173,7 +173,7 @@
     <button onclick="showModal('profileModal')">📄 Show Accounts</button>
     <button onclick="showModal('postsModal')">📝 Show Posts</button>
     <button onclick="pickRandom('Caption'); openThreads()">🖊 Pick Caption</button>
-    <button onclick="pickTodayPost(); openThreads()">📅 Pick Post</button>
+    <button onclick="pickTodayPost()">📅 Pick Post</button>
     <button onclick="pickRandom('Reply'); openThreads()">💬 Pick Reply</button>
     <button onclick="pickRandom('Comments'); openThreads()">💭 Pick Comment</button>
     
@@ -329,7 +329,8 @@ function resetPickedPosts() {
   showToast("Post pool reset!");
 }
 
-async function pickTodayPost() {
+//media attach shit
+async function openThreadsMediaPicker() {
   try {
     showToast("Picking today's post...");
     const posts = await fetchSheet('Posts');
@@ -357,6 +358,46 @@ async function pickTodayPost() {
 
     await navigator.clipboard.writeText(finalText);
     showToast("Post copied with location!");
+    window.open("https://www.threads.net/intent/post");
+  } catch (e) {
+    showToast("Error picking post");
+  }
+}
+
+    
+let lastPickedText = ""; //ito dagdag
+async function pickTodayPost() {
+  try {
+    showToast("Picking today's post...");
+    const posts = await fetchSheet('Posts');
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const today = days[new Date().getDay()];
+
+    const todayPosts = posts
+      .map((row, index) => ({ index, text: row[today] }))
+      .filter(p => p.text?.trim());
+
+    if (!pickedPostIndexes[today]) pickedPostIndexes[today] = [];
+    const unused = todayPosts.filter(p => !pickedPostIndexes[today].includes(p.index));
+
+    if (unused.length === 0) {
+      pickedPostIndexes[today] = [];
+      showToast("All posts used, restarting pool");
+      return pickTodayPost();
+    }
+
+    const selected = unused[Math.floor(Math.random() * unused.length)];
+    pickedPostIndexes[today].push(selected.index);
+
+    const location = profiles[currentProfile]?.location || profiles[currentProfile]?.Location || "";
+    const finalText = selected.text.replace(/\(loc\)/gi, location);
+
+    /*await navigator.clipboard.writeText(finalText);
+    showToast("Post copied with location!");*/
+    lastPickedText = finalText;
+    const encoded = encodeURIComponent(finalText);
+    window.open(`https://www.threads.net/intent/post?text=${encoded}`, "_blank");
+    showToast("Opening Threads…");
   } catch (e) {
     showToast("Error picking post");
   }
