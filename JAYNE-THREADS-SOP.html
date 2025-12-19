@@ -174,7 +174,7 @@
     <button onclick="showModal('postsModal')">📝 Show Posts</button>
     <button onclick="pickRandom('Caption'); openThreads()">🖊 Pick Caption</button>
     <button onclick="pickTodayPost()">📅 Pick Post</button>
-    <button onclick="pickRandom('Reply'); openThreads()">💬 Pick Reply</button>
+    <button onclick="pickRandomTopicAndSearch()">🇺🇸 Topics</button>
     <button onclick="pickPicCap('Comments')">🖼️ Pic Caption</button>
     
   </div>
@@ -365,6 +365,52 @@ function resetPickedPosts() {
   pickedPostIndexes = {};
   showToast("Post pool reset!");
 }
+
+// USA TOPICS - Fixed & Integrated
+  let hotTopics = [];
+
+  async function fetchHotTopics() {
+    if (hotTopics.length > 0) return; // Already loaded
+
+    try {
+      // Fetch from the 'Reply' sheet specifically
+      const data = await fetchSheet('Reply'); // Using your existing fetchSheet function
+
+      // Assuming your Topics sheet has a column like "topic" or the first value is the topic
+      // Adjust the key if your column header is different (e.g., "hot_topic", "text", etc.)
+      hotTopics = data
+        .map(item => {
+          // Try common possible keys, fallback to first value
+          return (item.topic || item.hot_topic || item.text || item.reply || Object.values(item)[0])?.trim();
+        })
+        .filter(topic => topic && topic.length > 0);
+
+      if (hotTopics.length === 0) {
+        console.warn("No topics found in 'Topics' sheet. Using fallback.");
+        hotTopics = ['Trump news', 'US economy', 'immigration policy', '2026 elections'];
+      }
+    } catch (error) {
+      console.error('Error loading hot topics:', error);
+      showToast("Failed to load USA topics");
+      hotTopics = ['Trump news', 'US economy', 'breaking news'];
+    }
+  }
+
+  async function pickRandomTopicAndSearch() {
+    await fetchHotTopics();
+
+    if (hotTopics.length === 0) {
+      showToast("No topics available");
+      return;
+    }
+
+    const randomTopic = hotTopics[Math.floor(Math.random() * hotTopics.length)];
+    const query = encodeURIComponent(randomTopic);
+    const threadsUrl = `https://www.threads.net/search?q=${query}`;
+
+    window.open(threadsUrl, '_blank');
+    showToast(`Searching: "${randomTopic}"`);
+  }
 
 //media attach shit
 async function openThreadsMediaPicker() {
