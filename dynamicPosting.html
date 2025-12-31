@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>CYRIL THREADS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-elevated: #1a1a24;
+      --accent-primary: #ff2d55;
+      --accent-secondary: #ff6b35;
+      --accent-gradient: linear-gradient(135deg, #ff2d55 0%, #ff6b35 100%);
+      --text-primary: #ffffff;
+      --text-secondary: #8a8a9a;
+      --text-muted: #5a5a6a;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --status-active: #00d26a;
+      --status-suspended: #ff3b30;
+      --status-verification: #ffcc00;
+      --glow-primary: rgba(255, 45, 85, 0.4);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      font-family: 'Space Mono', monospace;
+      background: var(--bg-dark);
+      color: var(--text-primary);
+      min-height: 100vh;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: radial-gradient(ellipse at 20% 0%, rgba(255, 45, 85, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 100%, rgba(255, 107, 53, 0.06) 0%, transparent 50%), var(--bg-dark);
+      padding: 16px;
+      padding-bottom: 100px;
+    }
+
+    /* LOADING OVERLAY - BRIGHT BLUE (#0066FF) for automation detection */
+    #loadingOverlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: #0066FF;
+      z-index: 9999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: opacity 0.3s ease;
+    }
+    #loadingOverlay.hidden { opacity: 0; pointer-events: none; }
+    #loadingOverlay::before {
+      content: ''; width: 60px; height: 60px;
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    #loadingOverlay span {
+      margin-top: 20px; font-family: 'Bebas Neue', sans-serif;
+      font-size: 24px; letter-spacing: 4px; color: #fff;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Setup Screen */
+    #setupScreen {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 80vh; padding: 20px;
+    }
+    #setupScreen.hidden { display: none; }
+
+    .setup-container {
+      background: var(--bg-card); border: 1px solid var(--border-subtle);
+      border-radius: 16px; padding: 32px; width: 100%; max-width: 480px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+    .setup-logo {
+      font-family: 'Bebas Neue', sans-serif; font-size: 48px;
+      background: var(--accent-gradient); -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent; background-clip: text;
+      text-align: center; margin-bottom: 8px; letter-spacing: 6px;
+    }
+    .setup-subtitle {
+      text-align: center; color: var(--text-secondary); font-size: 12px;
+      margin-bottom: 32px; letter-spacing: 2px; text-transform: uppercase;
+    }
+    .setup-input-group { margin-bottom: 20px; }
+    .setup-input-group label {
+      display: block; font-size: 11px; color: var(--text-secondary);
+      margin-bottom: 8px; letter-spacing: 1px; text-transform: uppercase;
+    }
+    .setup-input-group input {
+      width: 100%; padding: 14px 16px; background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle); border-radius: 8px;
+      color: var(--text-primary); font-family: 'Space Mono', monospace; font-size: 13px;
+    }
+    .setup-input-group input:focus {
+      outline: none; border-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px var(--glow-primary);
+    }
+    .setup-btn {
+      width: 100%; padding: 16px; background: var(--accent-gradient); border: none;
+      border-radius: 8px; color: #fff; font-family: 'Bebas Neue', sans-serif;
+      font-size: 20px; letter-spacing: 3px; cursor: pointer; margin-top: 12px;
+    }
+    .setup-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px var(--glow-primary); }
+
+    /* Main App */
+    #mainApp { display: none; }
+    #mainApp.visible { display: block; }
+
+    /* Header */
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border-subtle);
+    }
+    .header-logo {
+      font-family: 'Bebas Neue', sans-serif; font-size: 28px;
+      background: var(--accent-gradient); -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent; letter-spacing: 3px;
+    }
+    .header-actions { display: flex; gap: 8px; }
+    .icon-btn {
+      width: 40px; height: 40px; border-radius: 10px; background: var(--bg-card);
+      border: 1px solid var(--border-subtle); color: var(--text-secondary);
+      font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .icon-btn:hover { background: var(--bg-elevated); border-color: var(--accent-primary); }
+
+    /* Profile Card */
+    .profile-card {
+      background: var(--bg-card); border: 2px solid var(--border-subtle);
+      border-radius: 16px; padding: 20px; margin-bottom: 16px;
+      position: relative; overflow: hidden; transition: all 0.3s ease;
+    }
+    .profile-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+      background: var(--accent-gradient); opacity: 0.5;
+    }
+    .profile-card[data-status="active"] {
+      border-color: var(--status-active);
+      box-shadow: 0 0 30px rgba(0, 210, 106, 0.2);
+      background: linear-gradient(180deg, rgba(0, 210, 106, 0.1) 0%, var(--bg-card) 100%);
+    }
+    .profile-card[data-status="active"]::before { background: var(--status-active); opacity: 1; }
+    .profile-card[data-status="suspended"] {
+      border-color: var(--status-suspended);
+      box-shadow: 0 0 30px rgba(255, 59, 48, 0.2);
+      background: linear-gradient(180deg, rgba(255, 59, 48, 0.1) 0%, var(--bg-card) 100%);
+    }
+    .profile-card[data-status="suspended"]::before { background: var(--status-suspended); opacity: 1; }
+    .profile-card[data-status="human verification"] {
+      border-color: var(--status-verification);
+      box-shadow: 0 0 30px rgba(255, 204, 0, 0.2);
+      background: linear-gradient(180deg, rgba(255, 204, 0, 0.1) 0%, var(--bg-card) 100%);
+    }
+    .profile-card[data-status="human verification"]::before { background: var(--status-verification); opacity: 1; }
+
+    .profile-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+    .profile-avatar {
+      width: 56px; height: 56px; border-radius: 14px; background: var(--accent-gradient);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Bebas Neue', sans-serif; font-size: 24px; color: #fff;
+    }
+    .profile-info { flex: 1; min-width: 0; }
+    .profile-username {
+      font-family: 'Bebas Neue', sans-serif; font-size: 24px; letter-spacing: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .profile-location {
+      color: var(--text-secondary); font-size: 12px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .profile-location::before { content: '📍'; }
+
+    .profile-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    .meta-item { background: var(--bg-elevated); border-radius: 10px; padding: 12px; }
+    .meta-label {
+      font-size: 10px; color: var(--text-muted); text-transform: uppercase;
+      letter-spacing: 1px; margin-bottom: 4px;
+    }
+    .meta-value { font-size: 14px; font-weight: 700; }
+
+    .profile-status {
+      display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;
+      border-radius: 20px; font-size: 12px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+    .profile-status[data-status="active"] { background: rgba(0, 210, 106, 0.15); color: var(--status-active); }
+    .profile-status[data-status="suspended"] { background: rgba(255, 59, 48, 0.15); color: var(--status-suspended); }
+    .profile-status[data-status="human verification"] { background: rgba(255, 204, 0, 0.15); color: var(--status-verification); }
+    .profile-status::before {
+      content: ''; width: 8px; height: 8px; border-radius: 50%;
+      background: currentColor; animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    /* Navigation */
+    .nav-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+    .nav-btn {
+      padding: 14px 8px; background: var(--bg-card); border: 1px solid var(--border-subtle);
+      border-radius: 12px; color: var(--text-primary); font-family: 'Space Mono', monospace;
+      font-size: 10px; font-weight: 700; text-transform: uppercase; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+    }
+    .nav-btn span { font-size: 20px; }
+    .nav-btn:hover { background: var(--bg-elevated); border-color: var(--accent-primary); }
+    .nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Status Section */
+    .section-title {
+      font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 2px;
+      color: var(--text-secondary); margin-bottom: 12px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border-subtle); }
+
+    .status-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+    .status-btn {
+      padding: 12px; border-radius: 10px; border: 2px solid var(--border-subtle);
+      font-family: 'Space Mono', monospace; font-size: 10px; font-weight: 700;
+      text-transform: uppercase; cursor: pointer; background: var(--bg-card); color: var(--text-secondary);
+    }
+    .status-btn.active-btn { border-color: var(--status-active); color: var(--status-active); }
+    .status-btn.active-btn:hover { background: rgba(0, 210, 106, 0.15); }
+    .status-btn.verification-btn { border-color: var(--status-verification); color: var(--status-verification); }
+    .status-btn.verification-btn:hover { background: rgba(255, 204, 0, 0.15); }
+    .status-btn.suspended-btn { border-color: var(--status-suspended); color: var(--status-suspended); }
+    .status-btn.suspended-btn:hover { background: rgba(255, 59, 48, 0.15); }
+
+    /* Action Buttons */
+    .action-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+    .action-btn {
+      padding: 16px; background: var(--bg-card); border: 1px solid var(--border-subtle);
+      border-radius: 12px; color: var(--text-primary); font-family: 'Space Mono', monospace;
+      font-size: 12px; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .action-btn span { font-size: 22px; }
+    .action-btn:hover { background: var(--bg-elevated); border-color: var(--accent-primary); }
+
+    /* Threads Check */
+    .threads-check {
+      background: var(--bg-card); border: 1px solid var(--border-subtle);
+      border-radius: 12px; padding: 16px;
+      display: flex; align-items: center; gap: 16px; margin-bottom: 16px;
+    }
+    .threads-check-btn {
+      padding: 12px 20px; background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+      border-radius: 10px; color: var(--text-primary); font-family: 'Space Mono', monospace;
+      font-size: 12px; font-weight: 700; cursor: pointer;
+    }
+    .status-indicator {
+      width: 24px; height: 24px; border-radius: 6px; background: var(--bg-elevated);
+      border: 2px solid var(--border-subtle); transition: all 0.3s ease;
+    }
+    .status-indicator.online { background: var(--status-active); border-color: var(--status-active); box-shadow: 0 0 15px rgba(0, 210, 106, 0.5); }
+    .status-indicator.offline { background: var(--status-suspended); border-color: var(--status-suspended); box-shadow: 0 0 15px rgba(255, 59, 48, 0.5); }
+    .threads-result { flex: 1; font-size: 12px; color: var(--text-secondary); }
+
+    /* Modal */
+    .modal {
+      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px);
+      z-index: 1000; align-items: flex-end; justify-content: center; padding: 16px;
+    }
+    .modal.visible { display: flex; }
+    .modal-content {
+      background: var(--bg-card); border: 1px solid var(--border-subtle);
+      border-radius: 20px 20px 0 0; width: 100%; max-height: 80vh; overflow: hidden;
+      animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px; border-bottom: 1px solid var(--border-subtle);
+    }
+    .modal-title { font-family: 'Bebas Neue', sans-serif; font-size: 24px; letter-spacing: 2px; }
+    .modal-close {
+      width: 36px; height: 36px; border-radius: 50%; background: var(--bg-elevated);
+      border: none; color: var(--text-secondary); font-size: 20px; cursor: pointer;
+    }
+    .modal-close:hover { background: var(--accent-primary); color: #fff; }
+    .modal-body { padding: 16px; overflow-y: auto; max-height: calc(80vh - 80px); }
+
+    /* Table */
+    .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .data-table th {
+      background: var(--bg-elevated); color: var(--accent-primary);
+      font-family: 'Bebas Neue', sans-serif; font-size: 14px; letter-spacing: 1px;
+      padding: 12px 8px; text-align: left; position: sticky; top: 0;
+    }
+    .data-table td { padding: 10px 8px; border-bottom: 1px solid var(--border-subtle); color: var(--text-secondary); }
+    .data-table tr { cursor: pointer; transition: all 0.2s ease; }
+    .data-table tr:hover td { background: var(--bg-elevated); color: var(--text-primary); }
+    .data-table tr.selected td { background: var(--accent-primary); color: #fff; }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px);
+      background: var(--bg-card); border: 1px solid var(--accent-primary);
+      color: var(--text-primary); padding: 14px 24px; border-radius: 12px;
+      font-size: 13px; font-weight: 700; z-index: 2000; opacity: 0;
+      transition: all 0.3s ease; box-shadow: 0 10px 40px rgba(255, 45, 85, 0.3);
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+    .footer-info { text-align: center; padding: 20px; color: var(--text-muted); font-size: 11px; }
+  </style>
+</head>
+<body data-loading="true">
+  <div id="loadingOverlay"><span>LOADING</span></div>
+
+  <div id="setupScreen">
+    <div class="setup-container">
+      <div class="setup-logo">CYRIL</div>
+      <div class="setup-subtitle">Threads Management Dashboard</div>
+      <div class="setup-input-group">
+        <label>Google Apps Script URL</label>
+        <input type="text" id="apiUrlInput" placeholder="https://script.google.com/macros/s/...">
+      </div>
+      <button class="setup-btn" onclick="saveAndConnect()">CONNECT</button>
+    </div>
+  </div>
+
+  <div id="mainApp">
+    <div class="header">
+      <div class="header-logo">CYRIL THREADS</div>
+      <div class="header-actions">
+        <button class="icon-btn" onclick="preloadSheets()" title="Refresh">🔄</button>
+        <button class="icon-btn" onclick="showSettings()" title="Settings">⚙️</button>
+      </div>
+    </div>
+
+    <div class="profile-card" id="profileCard" data-status="">
+      <div class="profile-header">
+        <div class="profile-avatar" id="profileAvatar">?</div>
+        <div class="profile-info">
+          <div class="profile-username" id="profileUsername">Loading...</div>
+          <div class="profile-location" id="profileLocation">-</div>
+        </div>
+      </div>
+      <div class="profile-meta">
+        <div class="meta-item">
+          <div class="meta-label">Container ID</div>
+          <div class="meta-value" id="profileContainer">-</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Shortcut</div>
+          <div class="meta-value" id="profileShortcut">-</div>
+        </div>
+      </div>
+      <div class="profile-status" id="profileStatus" data-status="">
+        <span id="profileStatusText">-</span>
+      </div>
+    </div>
+
+    <div class="nav-grid">
+      <button class="nav-btn" onclick="prevProfile()"><span>◀️</span>Prev</button>
+      <button class="nav-btn" onclick="nextProfile()"><span>▶️</span>Next</button>
+      <button class="nav-btn" onclick="goToFirstProfile()"><span>⏮️</span>First</button>
+      <button class="nav-btn" onclick="preloadSheets()"><span>🔄</span>Refresh</button>
+    </div>
+
+    <div class="section-title">Update Account Status</div>
+    <div class="status-grid">
+      <button class="status-btn active-btn" onclick="updateStatus('active')">✅ Active</button>
+      <button class="status-btn verification-btn" onclick="updateStatus('human verification')">⚠️ Verify</button>
+      <button class="status-btn suspended-btn" onclick="updateStatus('suspended')">🚫 Suspended</button>
+    </div>
+
+    <div class="action-grid">
+      <button class="action-btn" onclick="openActiveThreads()"><span>🧵</span>Open Threads</button>
+      <button class="action-btn" onclick="pickRandomAndOpen('Caption')"><span>✍️</span>Caption</button>
+      <button class="action-btn" onclick="pickTodayPost()"><span>📅</span>Today's Post</button>
+      <button class="action-btn" onclick="pickRandomTopicAndSearch()"><span>🔍</span>Topics</button>
+      <button class="action-btn" onclick="pickRandomAndOpen('PhotoCaption')"><span>🖼️</span>Pic Caption</button>
+      <button class="action-btn" onclick="pickRandomAndOpen('Comments')"><span>💬</span>Comments</button>
+      <button class="action-btn" onclick="showModal('profileModal')"><span>📋</span>Accounts</button>
+      <button class="action-btn" onclick="showModal('postsModal')"><span>📝</span>Posts</button>
+    </div>
+
+    <div class="threads-check">
+      <button class="threads-check-btn" onclick="checkThreads()">Check Threads</button>
+      <div class="status-indicator" id="threadsIndicator"></div>
+      <div class="threads-result" id="threadsResult">Tap to check status</div>
+    </div>
+
+    <div class="footer-info">JAYNE THREADS PIC SOP<br><span id="accountCounter">Account 0 of 0</span></div>
+  </div>
+
+  <div id="profileModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">📋 Accounts (Tap to Select)</div>
+        <button class="modal-close" onclick="hideModal('profileModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <table class="data-table" id="profileTable">
+          <thead><tr><th>#</th><th>Username</th><th>Location</th><th>Status</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="postsModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">📝 Posts Schedule</div>
+        <button class="modal-close" onclick="hideModal('postsModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <table class="data-table" id="postsTable"><thead></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <div id="settingsModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">⚙️ Settings</div>
+        <button class="modal-close" onclick="hideModal('settingsModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="setup-input-group">
+          <label>Google Apps Script URL</label>
+          <input type="text" id="settingsApiUrl" placeholder="https://script.google.com/macros/s/...">
+        </div>
+        <button class="setup-btn" onclick="updateApiUrl()">UPDATE & RECONNECT</button>
+        <button class="setup-btn" style="background: var(--status-suspended); margin-top: 10px;" onclick="clearAllData()">CLEAR ALL DATA</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    const STORAGE_KEY = 'cyril_threads_config';
+    let API_URL = '';
+    let profiles = [];
+    let currentProfile = 0;
+    let sheetCache = {};
+    let pickedPostIndexes = {};
+    let hotTopics = [];
+
+    // ===== INITIALIZATION =====
+    function init() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const config = JSON.parse(saved);
+        API_URL = config.apiUrl || '';
+        if (API_URL) { showMainApp(); preloadSheets(); }
+        else { hideLoading(); }
+      } else { hideLoading(); }
+    }
+
+    function saveAndConnect() {
+      const url = document.getElementById('apiUrlInput').value.trim();
+      if (!url) { showToast('Please enter a valid URL'); return; }
+      API_URL = url;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ apiUrl: url }));
+      showMainApp();
+      preloadSheets();
+    }
+
+    function showMainApp() {
+      document.getElementById('setupScreen').classList.add('hidden');
+      document.getElementById('mainApp').classList.add('visible');
+    }
+
+    function showSettings() {
+      document.getElementById('settingsApiUrl').value = API_URL;
+      showModal('settingsModal');
+    }
+
+    function updateApiUrl() {
+      const url = document.getElementById('settingsApiUrl').value.trim();
+      if (!url) { showToast('Please enter a valid URL'); return; }
+      API_URL = url;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ apiUrl: url }));
+      hideModal('settingsModal');
+      sheetCache = {};
+      preloadSheets();
+    }
+
+    function clearAllData() {
+      if (confirm('Clear all saved data?')) { localStorage.clear(); location.reload(); }
+    }
+
+    // ===== LOADING STATE =====
+    function showLoading() {
+      document.body.setAttribute('data-loading', 'true');
+      document.getElementById('loadingOverlay').classList.remove('hidden');
+      setButtonsDisabled(true);
+    }
+
+    function hideLoading() {
+      document.body.setAttribute('data-loading', 'false');
+      document.getElementById('loadingOverlay').classList.add('hidden');
+      setButtonsDisabled(false);
+    }
+
+    function setButtonsDisabled(disabled) {
+      document.querySelectorAll('button').forEach(btn => {
+        if (!btn.classList.contains('modal-close')) btn.disabled = disabled;
+      });
+    }
+
+    // ===== DATA FETCHING =====
+    async function fetchSheet(sheetName) {
+      if (sheetCache[sheetName]) return sheetCache[sheetName];
+      try {
+        const res = await fetch(`${API_URL}?sheet=${sheetName}`);
+        if (!res.ok) throw new Error("Failed to fetch " + sheetName);
+        const data = await res.json();
+        sheetCache[sheetName] = data;
+        return data;
+      } catch (e) {
+        console.error('Fetch error:', e);
+        throw e;
+      }
+    }
+
+    async function preloadSheets() {
+      try {
+        showLoading();
+        showToast("Refreshing data...");
+        sheetCache = {};
+        const savedIndex = parseInt(localStorage.getItem('lastProfileIndex')) || 0;
+        
+        profiles = await fetchSheet('Accounts');
+        await fetchSheet('Posts');
+        await fetchSheet('Reply');
+        await fetchSheet('Comments');
+        await fetchSheet('Caption');
+        await fetchSheet('Topics');
+        await fetchSheet('PhotoCaption').catch(() => []); // Optional sheet
+        
+        showToast("Data loaded!");
+        displayProfile(savedIndex);
+      } catch (e) {
+        console.error(e);
+        showToast("Failed to load data");
+      } finally { hideLoading(); }
+    }
+
+    // ===== PROFILE DISPLAY =====
+    function displayProfile(index) {
+      if (profiles.length === 0) return;
+      currentProfile = (index + profiles.length) % profiles.length;
+      localStorage.setItem('lastProfileIndex', currentProfile);
+      const profile = profiles[currentProfile];
+      const status = (profile.status || '').toLowerCase();
+
+      document.getElementById('profileCard').setAttribute('data-status', status);
+      document.getElementById('profileAvatar').textContent = (profile.username || '?')[0].toUpperCase();
+      document.getElementById('profileUsername').textContent = profile.username || '-';
+      document.getElementById('profileLocation').textContent = profile.location || '-';
+      document.getElementById('profileContainer').textContent = profile.container || '-';
+      document.getElementById('profileShortcut').textContent = profile.shortcut || '-';
+
+      const statusEl = document.getElementById('profileStatus');
+      statusEl.setAttribute('data-status', status);
+      document.getElementById('profileStatusText').textContent = profile.status || 'Unknown';
+      document.getElementById('accountCounter').textContent = `Account ${currentProfile + 1} of ${profiles.length}`;
+    }
+
+    function nextProfile() { displayProfile(currentProfile + 1); }
+    function prevProfile() { displayProfile(currentProfile - 1); }
+    function goToFirstProfile() { displayProfile(0); }
+
+    // ===== NEXT BUTTON - Runs NEXT profile's shortcut =====
+    function runNextAndAdvance() {
+      // Calculate next profile index
+      const nextIndex = (currentProfile + 1) % profiles.length;
+      const nextProfileData = profiles[nextIndex];
+      const shortcutName = nextProfileData?.shortcut || nextProfileData?.container || '';
+      
+      // Move to next profile first
+      nextProfile();
+      
+      // Then run the shortcut for that profile
+      if (shortcutName) {
+        const encoded = encodeURIComponent(shortcutName);
+        window.location.href = `shortcuts://run-shortcut?name=${encoded}`;
+      } else { 
+        showToast("No shortcut defined for next account"); 
+      }
+    }
+
+    function openActiveThreads() {
+      const profile = profiles[currentProfile];
+      const shortcutName = profile.shortcut || profile.container || '';
+      if (shortcutName) {
+        const encoded = encodeURIComponent(shortcutName);
+        window.location.href = `shortcuts://run-shortcut?name=${encoded}`;
+      } else { showToast("No shortcut defined"); }
+    }
+
+    // ===== PREV BUTTON - Runs PREVIOUS profile's shortcut =====
+    function runPrevAndGo() {
+      // Calculate previous profile index
+      const prevIndex = (currentProfile - 1 + profiles.length) % profiles.length;
+      const prevProfileData = profiles[prevIndex];
+      const shortcutName = prevProfileData?.shortcut || prevProfileData?.container || '';
+      
+      // Move to previous profile first
+      prevProfile();
+      
+      // Then run the shortcut for that profile
+      if (shortcutName) {
+        const encoded = encodeURIComponent(shortcutName);
+        window.location.href = `shortcuts://run-shortcut?name=${encoded}`;
+      } else { 
+        showToast("No shortcut defined for previous account"); 
+      }
+    }
+
+    // ===== STATUS UPDATE (Using GET redirect method to avoid CORS) =====
+    async function updateStatus(newStatus) {
+      const profile = profiles[currentProfile];
+      if (!profile) return;
+      
+      showLoading();
+      showToast(`Updating to ${newStatus}...`);
+      
+      try {
+        // Use GET method with redirect to avoid CORS issues
+        const params = new URLSearchParams({
+          action: 'updateStatus',
+          username: profile.username,
+          status: newStatus
+        });
+        
+        const url = `${API_URL}?${params.toString()}`;
+        
+        // Fetch with no-cors mode
+        await fetch(url, { mode: 'no-cors' });
+        
+        // Update local data optimistically
+        profile.status = newStatus;
+        profiles[currentProfile] = profile;
+        sheetCache['Accounts'] = profiles;
+        displayProfile(currentProfile);
+        showToast(`Status: ${newStatus}!`);
+        
+      } catch (e) { 
+        console.error(e); 
+        showToast('Error - but status may have updated. Refresh to check.'); 
+      } finally { 
+        hideLoading(); 
+      }
+    }
+
+    // ===== MODAL FUNCTIONS =====
+    function showModal(id) {
+      if (id === 'profileModal') loadAccounts();
+      if (id === 'postsModal') loadPosts();
+      document.getElementById(id).classList.add('visible');
+    }
+
+    function hideModal(id) { document.getElementById(id).classList.remove('visible'); }
+
+    async function loadAccounts() {
+      try {
+        const accounts = await fetchSheet('Accounts');
+        const tbody = document.querySelector("#profileTable tbody");
+        tbody.innerHTML = accounts.map((p, index) => {
+          const status = (p.status || '').toLowerCase();
+          let statusColor = 'var(--text-muted)';
+          if (status === 'active') statusColor = 'var(--status-active)';
+          if (status === 'suspended') statusColor = 'var(--status-suspended)';
+          if (status === 'human verification') statusColor = 'var(--status-verification)';
+          const isSelected = index === currentProfile ? 'selected' : '';
+          return `<tr class="${isSelected}" onclick="selectProfile(${index})">
+            <td>${index + 1}</td>
+            <td>${p.username || '-'}</td>
+            <td>${p.location || '-'}</td>
+            <td style="color: ${statusColor}; font-weight: bold;">${p.status || '-'}</td>
+          </tr>`;
+        }).join('');
+      } catch (e) { showToast("Failed to load accounts"); }
+    }
+
+    function selectProfile(index) {
+      displayProfile(index);
+      hideModal('profileModal');
+      showToast(`Selected: ${profiles[index].username}`);
+    }
+
+    async function loadPosts() {
+      try {
+        const posts = await fetchSheet('Posts');
+        const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+        const thead = document.querySelector("#postsTable thead");
+        const tbody = document.querySelector("#postsTable tbody");
+        thead.innerHTML = '<tr>' + days.map(d => `<th>${d.slice(0,3)}</th>`).join('') + '</tr>';
+        tbody.innerHTML = posts.map(row => `<tr>` + days.map(day => `<td>${row[day] || ''}</td>`).join('') + '</tr>').join('');
+      } catch (e) { showToast("Failed to load posts"); }
+    }
+
+    // ===== CONTENT PICKING (Fixed) =====
+    async function pickRandomAndOpen(sheetName) {
+      try {
+        showToast(`Loading ${sheetName}...`);
+        
+        let data = sheetCache[sheetName];
+        if (!data) {
+          data = await fetchSheet(sheetName).catch(() => null);
+        }
+        
+        if (!data || data.length === 0) { 
+          showToast(`No data in ${sheetName}`); 
+          return; 
+        }
+        
+        const choice = data[Math.floor(Math.random() * data.length)];
+        let value = Object.values(choice)[0];
+        
+        if (!value) {
+          showToast(`Empty content in ${sheetName}`);
+          return;
+        }
+        
+        // Replace location placeholder
+        const loc = profiles[currentProfile]?.location || "";
+        value = value.replace(/\(loc\)/gi, loc);
+        
+        // Copy to clipboard
+        try {
+          await navigator.clipboard.writeText(value);
+          showToast(`Copied! Opening Threads...`);
+        } catch (clipErr) {
+          // Fallback for clipboard
+          console.log('Clipboard failed, using fallback');
+          const ta = document.createElement('textarea');
+          ta.value = value;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          showToast(`Copied! Opening Threads...`);
+        }
+        
+        // Open Threads with text
+        const encoded = encodeURIComponent(value);
+        window.open(`https://www.threads.net/intent/post?text=${encoded}`, "_blank");
+        
+      } catch (error) { 
+        console.error(error); 
+        showToast(`Error: ${error.message}`); 
+      }
+    }
+
+    async function pickTodayPost() {
+    try {
+      showToast("Picking today's post...");
+      const posts = await fetchSheet('Posts');
+      const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      const today = days[new Date().getDay()];
+      const todayLower = today.toLowerCase(); // Convert to lowercase to match headers
+      
+      const todayPosts = posts.map((row, index) => ({ 
+        index, 
+        text: row[todayLower] || row[today] // Try lowercase first, then original
+      })).filter(p => p.text?.trim());
+      
+      if (todayPosts.length === 0) {
+        showToast(`No posts for ${today}`);
+        return;
+      }
+      
+      if (!pickedPostIndexes[today]) pickedPostIndexes[today] = [];
+      const unused = todayPosts.filter(p => !pickedPostIndexes[today].includes(p.index));
+      
+      if (unused.length === 0) { 
+        pickedPostIndexes[today] = []; 
+        showToast("Restarting pool..."); 
+        return pickTodayPost(); 
+      }
+      
+      const selected = unused[Math.floor(Math.random() * unused.length)];
+      pickedPostIndexes[today].push(selected.index);
+      
+      const location = profiles[currentProfile]?.location || "";
+      const finalText = selected.text.replace(/\(loc\)/gi, location);
+      
+      // Copy to clipboard
+      try {
+        await navigator.clipboard.writeText(finalText);
+      } catch (e) {
+        const ta = document.createElement('textarea');
+        ta.value = finalText;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      
+      const encoded = encodeURIComponent(finalText);
+      window.open(`https://www.threads.net/intent/post?text=${encoded}`, "_blank");
+      showToast("Opening Threads…");
+    } catch (e) { 
+      console.error(e);
+      showToast("Error picking post"); 
+    }
+  }
+
+    // ===== TOPICS =====
+    async function fetchHotTopics() {
+      if (hotTopics.length > 0) return;
+      try {
+        const data = await fetchSheet('Topics'); // Reads from Topics sheet
+        hotTopics = data.map(item => (item.topic || item.topics || Object.values(item)[0])?.trim()).filter(t => t && t.length > 0);
+        
+        if (hotTopics.length === 0) {
+          showToast("No topics found! Add to Topics sheet.");
+        }
+      } catch (error) { 
+        console.error('Error loading topics:', error);
+        showToast("Failed to load Topics sheet");
+        hotTopics = [];
+      }
+    }
+
+    async function pickRandomTopicAndSearch() {
+      await fetchHotTopics();
+      if (hotTopics.length === 0) { 
+        showToast("Add topics to Topics sheet first!"); 
+        return; 
+      }
+      const randomTopic = hotTopics[Math.floor(Math.random() * hotTopics.length)];
+      window.open(`https://www.threads.net/search?q=${encodeURIComponent(randomTopic)}`, '_blank');
+      showToast(`Searching: "${randomTopic}"`);
+    }       
+
+    // ===== THREADS CHECK =====
+    function checkThreads() {
+      const indicator = document.getElementById("threadsIndicator");
+      const result = document.getElementById("threadsResult");
+      indicator.className = 'status-indicator';
+      result.textContent = "Checking...";
+      fetch("https://www.threads.net", { mode: "no-cors" })
+        .then(() => { indicator.classList.add('online'); result.textContent = "✅ Threads is reachable"; })
+        .catch(() => { indicator.classList.add('offline'); result.textContent = "❌ Threads is blocked/offline"; });
+    }
+
+    function openThreads() { window.open("https://www.threads.net/", "_blank"); }
+
+    // ===== TOAST =====
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 2500);
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
