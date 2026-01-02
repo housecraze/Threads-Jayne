@@ -380,6 +380,7 @@
       <button class="action-btn" onclick="pickRandomAndOpen('Comments')"><span>💬</span>Comments</button>
       <button class="action-btn" onclick="showModal('profileModal')"><span>📋</span>Accounts</button>
       <button class="action-btn" onclick="showModal('postsModal')"><span>📝</span>Posts</button>
+      <button class="action-btn" onclick="openGoogleSheet()"><span>📊</span>Open Sheet</button>
     </div>
 
     <div class="threads-check">
@@ -857,6 +858,23 @@
       toast.classList.add("show");
       setTimeout(() => toast.classList.remove("show"), 2500);
     }
+    
+    // ===== OPEN GOOGLE SHEET =====
+    async function openGoogleSheet() {
+      try {
+        const res = await fetch(`${API_URL}?action=getSheetUrl`);
+        const data = await res.json();
+        if (data.url) {
+          window.open(data.url, '_blank');
+          showToast(`Opening: ${data.name}`);
+        } else {
+          showToast("Couldn't get sheet URL");
+        }
+      } catch (e) {
+        showToast("Error getting sheet URL");
+      }
+    }
+    
 
     window.onload = init;
   </script>
