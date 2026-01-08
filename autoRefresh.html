@@ -462,17 +462,15 @@
     } else { hideLoading(); }
   }
 
-    // ===== AUTO REFRESH (Background) =====
+    // ===== AUTO REFRESH (Status Only) =====
     let autoRefreshInterval = null;
-    const AUTO_REFRESH_SECONDS = 30; // Refresh every 30 seconds (adjust as needed)
+    const AUTO_REFRESH_SECONDS = 30;
     
     function startAutoRefresh() {
-      // Clear any existing interval
       if (autoRefreshInterval) clearInterval(autoRefreshInterval);
       
-      // Start background refresh
       autoRefreshInterval = setInterval(() => {
-        backgroundRefresh();
+        backgroundRefreshStatus();
       }, AUTO_REFRESH_SECONDS * 1000);
       
       console.log(`Auto-refresh started: every ${AUTO_REFRESH_SECONDS}s`);
@@ -482,35 +480,25 @@
       if (autoRefreshInterval) {
         clearInterval(autoRefreshInterval);
         autoRefreshInterval = null;
-        console.log('Auto-refresh stopped');
       }
     }
     
-    async function backgroundRefresh() {
+    async function backgroundRefreshStatus() {
       try {
-        console.log('Background refresh...');
+        console.log('Background status refresh...');
         
-        // Clear cache to force fresh data
-        sheetCache = {};
+        // Fetch ONLY fresh accounts data (don't touch sheetCache for other sheets)
+        const res = await fetch(`${API_URL}?sheet=Accounts`);
+        const freshProfiles = await res.json();
         
-        // Fetch fresh data silently (no loading overlay)
-        const freshProfiles = await fetch(`${API_URL}?sheet=Accounts`).then(r => r.json());
-        
-        // Update profiles
+        // Update profiles and accounts cache only
         profiles = freshProfiles;
         sheetCache['Accounts'] = freshProfiles;
         
-        // Refresh other sheets in background
-        fetch(`${API_URL}?sheet=Posts`).then(r => r.json()).then(d => sheetCache['Posts'] = d);
-        fetch(`${API_URL}?sheet=Topics`).then(r => r.json()).then(d => { sheetCache['Topics'] = d; hotTopics = []; });
-        fetch(`${API_URL}?sheet=Caption`).then(r => r.json()).then(d => sheetCache['Caption'] = d);
-        fetch(`${API_URL}?sheet=Comments`).then(r => r.json()).then(d => sheetCache['Comments'] = d);
-        fetch(`${API_URL}?sheet=PhotoCaption`).then(r => r.json()).then(d => sheetCache['PhotoCaption'] = d).catch(() => {});
-        
-        // Update current display without changing position
+        // Update current display
         displayProfile(currentProfile);
         
-        console.log('Background refresh complete');
+        console.log('Status refresh complete');
       } catch (e) {
         console.error('Background refresh failed:', e);
       }
