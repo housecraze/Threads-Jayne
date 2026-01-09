@@ -377,7 +377,7 @@
       <button class="action-btn" onclick="pickTodayPost()"><span>📅</span>Today's Post</button>
       <button class="action-btn" onclick="pickRandomTopicAndSearch()"><span>🔍</span>Topics</button>
       <button class="action-btn" onclick="pickRandomAndOpen('PhotoCaption')"><span>🖼️</span>Pic Caption</button>
-      <button class="action-btn" onclick="pickRandomAndOpen('Comments')"><span>💬</span>Comments</button>
+      <button class="action-btn" onclick="copyRandom('Comments')"><span>💬</span>Comments</button>
       <button class="action-btn" onclick="showModal('profileModal')"><span>📋</span>Accounts</button>
       <button class="action-btn" onclick="showModal('postsModal')"><span>📝</span>Posts</button>
       <button class="action-btn" onclick="openGoogleSheet()"><span>📊</span>Open Sheet</button>
@@ -803,6 +803,54 @@
       }
     }
 
+    // ===== CONTENT copy only (Fixed) =====
+    async function copyRandom(sheetName) {
+    try {
+      showToast(`Loading ${sheetName}...`);
+      
+      let data = sheetCache[sheetName];
+      if (!data) {
+        data = await fetchSheet(sheetName).catch(() => null);
+      }
+      
+      if (!data || data.length === 0) { 
+        showToast(`No data in ${sheetName}`); 
+        return; 
+      }
+      
+      const choice = data[Math.floor(Math.random() * data.length)];
+      let value = Object.values(choice)[0];
+      
+      if (!value) {
+        showToast(`Empty content in ${sheetName}`);
+        return;
+      }
+      
+      // Replace location placeholder
+      const loc = profiles[currentProfile]?.location || "";
+      value = value.replace(/\(loc\)/gi, loc);
+      
+      // Copy to clipboard only
+      try {
+        await navigator.clipboard.writeText(value);
+        showToast(`${sheetName} copied!`);
+      } catch (clipErr) {
+        const ta = document.createElement('textarea');
+        ta.value = value;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast(`${sheetName} copied!`);
+      }
+      
+    } catch (error) { 
+      console.error(error); 
+      showToast(`Error: ${error.message}`); 
+    }
+  }
+
+    
     async function pickTodayPost() {
     try {
       showToast("Picking today's post...");
